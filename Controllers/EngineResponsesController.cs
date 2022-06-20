@@ -23,11 +23,11 @@ namespace WebApplication1.Controllers
     {
 
         //private readonly EngineContext _context;
-
+        StringBuilder stringBuilder = new StringBuilder();
         // GET: api/engineStatus/list
         [HttpGet]
         [Route("list")]
-        public  async Task<ActionResult<string>> GetEngineStatusList()
+        public async Task<ActionResult<string>> GetEngineStatusList()
         {
             //엔진서버 읽어오기
 
@@ -36,61 +36,28 @@ namespace WebApplication1.Controllers
             //string result;
             if (!System.IO.File.Exists(FILEPATH))
             {
-               
+
             }
 
             string[] engineUrls = await System.IO.File.ReadAllLinesAsync(FILEPATH);
 
-            StringBuilder stringBuilder = new StringBuilder();
+            List<Task> tasks = new List<Task>();
 
             //한줄씩 ip와 port 추출하기
-            foreach(string url in engineUrls)
+         
+
+            foreach (string url in engineUrls)
             {
-                
 
-                string PATTERN = @".+?://(?<address>[0-9.]+):(?<port>[0-9]+)";
-                Regex regex = new Regex(PATTERN);
-                Match match = regex.Match(url);
-                if (match.Success)
-                {
-                    //추출한 값 저장하기
-                    string address = match.Result("${address}");
-                    string port = match.Result("${port}");
-                    Debug.WriteLine("address==>" + address+",port==>"+port);
-                    //xml문서 만들기
-                    XmlRpcStruct xmlRpcStuct = new XmlRpcStruct();
-                    xmlRpcStuct.Add("text", "apple");
+                Task task = new Task(() => { GetEngineStatusLog(url); });
+                tasks.Add(task);
 
-                    //번역서버상태
-                    Boolean translateResult=false;
-                    try
-                    {
-                        //서버에 요청하기
-                        XmlRpcAPI xmlRpcAPI = new XmlRpcAPI();
-                        XmlRpcStruct res = (XmlRpcStruct)xmlRpcAPI.translateValue(xmlRpcStuct, url);
-                        string resultWord = (string)res["text"];
+                task.Start();
 
-                        translateResult = resultWord.Contains("사과");
-                    }
-                    catch(Exception e) {
-                        Debug.WriteLine(e.ToString());
-                        translateResult = false;
-                    }
-                    finally
-                    {
-                        
-                        //예시: engine_status{ip="localhost",port="22"} 1                  
-
-                        string urlResult = String.Format(@"engine_status {{ip=""{0}"",port=""{1}""}}  {2}", address, port, translateResult ? "1" : "0");          
-                        stringBuilder.AppendLine(urlResult);
-                    }
-
-                    
-                }
             }
 
-            
 
+            Task.WaitAll(tasks.ToArray());
 
             // return await _context.engineResponses.ToListAsync();
 
@@ -102,9 +69,49 @@ namespace WebApplication1.Controllers
 
 
         #region 번역서버에서 상태값 가져오기
-        private void getEngineStatusLog()
+        private void GetEngineStatusLog(string url)
         {
+            string PATTERN = @".+?://(?<address>[0-9.]+):(?<port>[0-9]+)";
+            Regex regex = new Regex(PATTERN);
+            Match match = regex.Match(url);
+            if (match.Success)
+            {
+                //추출한 값 저장하기
+                string address = match.Result("${address}");
+                string port = match.Result("${port}");
+                Debug.WriteLine("address==>" + address + ",port==>" + port);
+                //xml문서 만들기
+                XmlRpcStruct xmlRpcStuct = new XmlRpcStruct();
+                xmlRpcStuct.Add("text", "apple");
 
+                //번역서버상태
+                Boolean translateResult = false;
+                try
+                {
+                    Debug.WriteLine("sb상태==>"+stringBuilder.ToString());
+                    //서버에 요청하기
+                    XmlRpcAPI xmlRpcAPI = new XmlRpcAPI();
+                    XmlRpcStruct res = (XmlRpcStruct)xmlRpcAPI.translateValue(xmlRpcStuct, url);
+                    string resultWord = (string)res["text"];
+
+                    translateResult = resultWord.Contains("사과");
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine(e.ToString());
+                    translateResult = false;
+                }
+
+
+                //예시: engine_status{ip="localhost",port="22"} 1                  
+
+                string urlResult = String.Format(@"engine_status {{ip=""{0}"",port=""{1}""}}  {2}", address, port, translateResult ? "1" : "0");
+                Debug.WriteLine("urlResult상태==>" + urlResult);
+                stringBuilder.AppendLine(urlResult);
+
+
+
+            }
         }
         #endregion
     }
